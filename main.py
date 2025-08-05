@@ -3,7 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 import time
-from beautifulsoup4 import soup
+from bs4 import BeautifulSoup
 
 def setup_driver():
     """Initializes the driver options"""
@@ -26,8 +26,12 @@ def get_user_item():
     return 0
 
 def get_aldi_results(url):
+    # Initialize driver properly
+    driver = webdriver.Firefox()
+
     driver.get(url)
-    time.sleep(2)  # Optional wait to ensure page loads
+    time.sleep(5)  # Optional wait to ensure page loads
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
 
     # Find all the product tiles on the page
     product_tiles = soup.select('div[id^="product-tile-"]')
@@ -35,7 +39,7 @@ def get_aldi_results(url):
     # Loop through each tile
     for tile in product_tiles:
         # Find the name element within the tile
-        name_element = tile.select_one('.product-tile__name p')
+        name_element = tile.select_one('.product-tile__name')
         # Find the price element within the tile
         price_element = tile.select_one('.product-tile__price')
 
@@ -44,7 +48,7 @@ def get_aldi_results(url):
             name = name_element.text.strip()
             price_text = price_element.text.strip()
             # The parse_price function would then convert the text to a number
-            price = parse_price(price_text)
+            price = price_text 
             
             print(f"Found: {name} for {price}")
 
@@ -55,18 +59,15 @@ def main():
     setup_driver()
     element_list = []
 
-    for page in range(1, 3):
-        # Initialize driver properly
-        driver = webdriver.Firefox()
+    # Get user item
+    user_item = get_user_item();
 
-        # Get user item
-        user_item = get_user_item();
+    # Load the URL
+    walmart = f"https://www.walmart.com/search?q=" + user_item
+    target = "https://www.target.com/s?searchTerm=" + user_item
+    aldi = "https://www.aldi.us/results?q=" + user_item
 
-        # Load the URL
-        walmart = f"https://www.walmart.com/search?q=" + user_item
-        target = "https://www.target.com/s?searchTerm=" + user_item
-        aldi = "https://www.aldi.us/results?q=" + user_item
-        get_aldi_results(aldi)
+    get_aldi_results(aldi)
 
 if __name__ == '__main__':
     main()
