@@ -85,6 +85,37 @@ def get_walmart_results(url):
 
     driver.quit()
 
+def get_target_results(url):
+    print("Scraping Target...")
+    # Initialize driver properly
+    driver = webdriver.Firefox()
+
+    driver.get(url)
+    time.sleep(5)  # Optional wait to ensure page loads
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+    # Find all the product tiles on the page
+    product_tiles = soup.select('[data-test^="ProductCard"]')
+    print(product_tiles)
+
+    # Loop through each tile
+    for tile in product_tiles:
+        # Find the name element within the tile
+        name_element = tile.select_one('a[title]')
+        # Find the price element within the tile
+        price_element = tile.select_one('span[data-test="current-price"] span')
+
+        # Get the text if the elements were found
+        if name_element and price_element:
+            name = name_element.text.strip()
+            price_text = price_element.text.strip()
+            # The parse_price function would then convert the text to a number
+            price = price_text 
+            
+            print(f"Found: {name} for {price}")
+
+    driver.quit()
+
 
 def main():
     setup_driver()
@@ -100,6 +131,7 @@ def main():
 
     get_aldi_results(aldi)
     # get_walmart_results(walmart)
+    get_target_results(target)
 
 if __name__ == '__main__':
     main()
