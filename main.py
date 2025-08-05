@@ -91,17 +91,16 @@ def get_target_results(url):
     driver = webdriver.Firefox()
 
     driver.get(url)
-    time.sleep(5)  # Optional wait to ensure page loads
+    time.sleep(10)  # Optional wait to ensure page loads
     soup = BeautifulSoup(driver.page_source, 'html.parser')
 
     # Find all the product tiles on the page
-    product_tiles = soup.select('[data-test^="ProductCard"]')
-    print(product_tiles)
+    product_tiles = soup.select('[data-test="@web/site-top-of-funnel/ProductCardWrapper"]')
 
     # Loop through each tile
     for tile in product_tiles:
         # Find the name element within the tile
-        name_element = tile.select_one('a[title]')
+        name_element = tile.select_one('[data-test="product-title"]')
         # Find the price element within the tile
         price_element = tile.select_one('span[data-test="current-price"] span')
 
