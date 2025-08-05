@@ -17,10 +17,17 @@ def setup_driver():
     # Use a proper Service object
     service = Service(ChromeDriverManager().install())
 
+def get_user_item():
+    user_item = input("Enter the item you wish to purchase: ")
+    if(user_item != ''):
+        return user_item
+    print("Invalid item")
+    return 0
+
 def main():
     setup_driver()
     element_list = []
-    
+
     for page in range(1, 3):
         # Initialize driver properly
         driver = webdriver.Firefox()
