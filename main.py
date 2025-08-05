@@ -26,6 +26,7 @@ def get_user_item():
     return 0
 
 def get_aldi_results(url):
+    print("Scraping Aldi...")
     # Initialize driver properly
     driver = webdriver.Firefox()
 
@@ -98,7 +99,7 @@ def main():
     aldi = "https://www.aldi.us/results?q=" + user_item
 
     get_aldi_results(aldi)
-    get_walmart_results(walmart)
+    # get_walmart_results(walmart)
 
 if __name__ == '__main__':
     main()
