@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 def setup_driver():
     """Initializes the driver options"""
     options = webdriver.ChromeOptions()
-    #options.add_argument("--headless")
+    options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     service = Service(ChromeDriverManager().install())
@@ -104,22 +104,23 @@ def get_target_results(url, output_queue):
         if 'driver' in locals() and driver:
             driver.quit()
 
-
-def scraping_main_logic(user_item, output_queue):
-    """The core logic, adapted to run in a thread."""
+def scraping_main_logic(item_list, output_queue):
+    """The core logic, adapted to loop through a list of items."""
     setup_driver()  # Original call maintained
 
-    # Construct URLs
-    walmart = f"https://www.walmart.com/search?q=" + user_item
-    target = "https://www.target.com/s?searchTerm=" + user_item
-    aldi = "https://www.aldi.us/results?q=" + user_item
+    for item in item_list:
+        output_queue.put(f"\n===== SEARCHING FOR: {item.upper()} =====")
+        # Construct URLs
+        walmart = f"https://www.walmart.com/search?q={item}"
+        target = f"https://www.target.com/s?searchTerm={item}"
+        aldi = f"https://www.aldi.us/results?q={item}"
 
-    # Run scrapers
-    get_aldi_results(aldi, output_queue)
-    get_walmart_results(walmart, output_queue)
-    get_target_results(target, output_queue)
+        # Run scrapers for the current item
+        get_aldi_results(aldi, output_queue)
+        get_walmart_results(walmart, output_queue)
+        get_target_results(target, output_queue)
     
-    output_queue.put("--- Search Complete ---")
+    output_queue.put("\n--- All Searches Complete ---")
 
 # --- GUI Application Class ---
 
@@ -127,7 +128,7 @@ class ScraperGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Web Scraper")
-        self.root.geometry("600x450")
+        self.root.geometry("600x500")
 
         self.output_queue = queue.Queue()
 
@@ -136,16 +137,16 @@ class ScraperGUI:
         top_frame = tk.Frame(self.root, pady=5)
         top_frame.pack(fill='x', padx=10, pady=5)
 
-        # Input Label and Entry
-        self.item_label = tk.Label(top_frame, text="Enter Item:")
+        # Updated Input Label and Entry
+        self.item_label = tk.Label(top_frame, text="Enter Items (comma-separated):")
         self.item_label.pack(side='left')
 
         self.item_entry = tk.Entry(top_frame, width=40)
         self.item_entry.pack(side='left', fill='x', expand=True, padx=5)
-        self.item_entry.bind("<Return>", self.start_search_thread) # Allow pressing Enter
+        self.item_entry.bind("<Return>", self.start_search_thread)
 
         # Search Button
-        self.search_button = tk.Button(top_frame, text="Search", command=self.start_search_thread)
+        self.search_button = tk.Button(top_frame, text="Search All", command=self.start_search_thread)
         self.search_button.pack(side='left')
 
         # Results Text Area
@@ -157,21 +158,24 @@ class ScraperGUI:
 
     def start_search_thread(self, event=None):
         """Starts the scraping process in a new thread to keep the GUI responsive."""
-        user_item = self.item_entry.get()
-        if not user_item:
-            messagebox.showwarning("Input Error", "Please enter an item to search for.")
+        items_string = self.item_entry.get()
+        # Create a list of items, stripping whitespace and ignoring empty entries
+        item_list = [item.strip() for item in items_string.split(',') if item.strip()]
+
+        if not item_list:
+            messagebox.showwarning("Input Error", "Please enter at least one item to search for.")
             return
 
         self.search_button.config(state='disabled')
         self.results_text.config(state='normal')
         self.results_text.delete('1.0', END)
-        self.results_text.insert(tk.END, f"Searching for '{user_item}'...\n\n")
+        self.results_text.insert(tk.END, f"Beginning search for {len(item_list)} item(s)...\n")
         self.results_text.config(state='disabled')
 
         # Run the blocking scraping task in a separate thread
         self.search_thread = threading.Thread(
             target=scraping_main_logic, 
-            args=(user_item, self.output_queue)
+            args=(item_list, self.output_queue)
         )
         self.search_thread.start()
 
@@ -185,7 +189,7 @@ class ScraperGUI:
                 self.results_text.see(END)  # Auto-scroll
                 self.results_text.config(state='disabled')
 
-                if "--- Search Complete ---" in message:
+                if "--- All Searches Complete ---" in message:
                     self.search_button.config(state='normal')
 
         except queue.Empty:
