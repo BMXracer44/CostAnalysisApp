@@ -8,6 +8,7 @@ from functools import partial
 # --- Web Scraping and Logic ---
 
 from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
 import time
 from bs4 import BeautifulSoup
 
@@ -21,9 +22,12 @@ def parse_price(price_text):
     return 0.0
 
 def get_aldi_results(url, results_list):
-    """Scrapes Aldi, adds top 5 results to a shared list."""
+    """Scrapes Aldi in headless mode, adds top 5 results to a shared list."""
     try:
-        driver = webdriver.Firefox()
+        options = Options()
+        options.add_argument("--headless")
+        driver = webdriver.Firefox(options=options)
+
         driver.get(url)
         time.sleep(5)
         soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -48,9 +52,12 @@ def get_aldi_results(url, results_list):
             driver.quit()
 
 def get_walmart_results(url, results_list):
-    """Scrapes Walmart, adds top 5 results to a shared list."""
+    """Scrapes Walmart in headless mode, adds top 5 results to a shared list."""
     try:
-        driver = webdriver.Firefox()
+        options = Options()
+        options.add_argument("--headless")
+        driver = webdriver.Firefox(options=options)
+        
         driver.get(url)
         time.sleep(5)
         soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -60,12 +67,19 @@ def get_walmart_results(url, results_list):
         for tile in product_tiles:
             if count >= 5: break
             name_element = tile.select_one('span[data-automation-id="product-title"]')
-            price_element = tile.select_one('span[class="product-price"]')
+            price_element = tile.select_one('div[data-automation-id="product-price"]')
             if name_element and price_element:
+                name = name_element.text.strip()
+                price_text = price_element.text.strip()
+                
+                # Format Walmart prices like '632' to '$6.32'
+                if price_text.isdigit() and len(price_text) > 4:
+                    price_text = f"${price_text[:-4]}.{price_text[-4:]}"
+
                 results_list.append({
                     'store': 'Walmart',
-                    'name': name_element.text.strip(),
-                    'price': price_element.text.strip()
+                    'name': name,
+                    'price': price_text
                 })
                 count += 1
     except Exception as e:
@@ -75,9 +89,12 @@ def get_walmart_results(url, results_list):
             driver.quit()
 
 def get_target_results(url, results_list):
-    """Scrapes Target, adds top 5 results to a shared list."""
+    """Scrapes Target in headless mode, adds top 5 results to a shared list."""
     try:
-        driver = webdriver.Firefox()
+        options = Options()
+        options.add_argument("--headless")
+        driver = webdriver.Firefox(options=options)
+        
         driver.get(url)
         time.sleep(10)
         soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -212,7 +229,7 @@ class ScraperGUI:
         choices = []
         for store, var in self.radio_vars.items():
             choice_index_str = var.get()
-            if choice_index_str: # Check if a selection was made
+            if choice_index_str:
                 choice_index = int(choice_index_str)
                 if choice_index >= 0:
                     choices.append(grouped_results[store][choice_index])
@@ -282,7 +299,6 @@ class ScraperGUI:
                 self.output_queue.put(("LOG", f"-> No results found for '{item}' at any store."))
                 continue
 
-            # Group results by store for the new selection window
             grouped_results = {'Aldi': [], 'Walmart': [], 'Target': []}
             for result in all_results:
                 grouped_results[result['store']].append(result)
