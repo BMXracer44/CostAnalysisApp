@@ -105,21 +105,35 @@ def get_target_results(url, output_queue):
             driver.quit()
 
 def scraping_main_logic(item_list, output_queue):
-    """The core logic, adapted to loop through a list of items."""
+    """The core logic, now runs searches for each item in parallel."""
     setup_driver()  # Original call maintained
 
     for item in item_list:
         output_queue.put(f"\n===== SEARCHING FOR: {item.upper()} =====")
+        
         # Construct URLs
-        walmart = f"https://www.walmart.com/search?q={item}"
-        target = f"https://www.target.com/s?searchTerm={item}"
-        aldi = f"https://www.aldi.us/results?q={item}"
+        #walmart_url = f"https://www.walmart.com/search?q={item}"
+        target_url = f"https://www.target.com/s?searchTerm={item}"
+        aldi_url = f"https://www.aldi.us/results?q={item}"
 
-        # Run scrapers for the current item
-        get_aldi_results(aldi, output_queue)
-        get_walmart_results(walmart, output_queue)
-        get_target_results(target, output_queue)
-    
+        # Define the scrapers to run in parallel
+        scrapers_to_run = [
+            (get_aldi_results, aldi_url),
+            #(get_walmart_results, walmart_url),
+            (get_target_results, target_url)
+        ]
+
+        threads = []
+        for scraper_func, url in scrapers_to_run:
+            # Create and start a thread for each website
+            thread = threading.Thread(target=scraper_func, args=(url, output_queue))
+            threads.append(thread)
+            thread.start()
+
+        # Wait for all threads (for the current item) to complete
+        for thread in threads:
+            thread.join()
+
     output_queue.put("\n--- All Searches Complete ---")
 
 # --- GUI Application Class ---
