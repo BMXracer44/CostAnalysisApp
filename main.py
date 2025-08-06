@@ -256,7 +256,7 @@ class ScraperGUI:
             total = 0
             for item in items:
                 price = parse_price(item['price'])
-                if(store == "walmart"):
+                if(store == "Walmart"):
                     price /= 10
                 total += price
                 self.update_log(f"  - {item['name']}: ${price:.2f}")
@@ -278,7 +278,7 @@ class ScraperGUI:
     def run_shopping_flow(self, item_list):
         """Main logic for the scraper thread."""
         for item in item_list:
-            self.output_queue.put(("LOG", f"\n===== Searching for: {item.upper()} ====="))
+            self.output_queue.put(("LOG", f"\n===== Searching for: {item.upper()} =====\nPlease wait..."))
             
             all_results = []
             threads = []
