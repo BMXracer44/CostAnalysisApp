@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import scrolledtext, END, messagebox, Toplevel, Radiobutton, StringVar
+from tkinter import scrolledtext, END, messagebox, Toplevel, Radiobutton, StringVar, LabelFrame
 import threading
 import queue
 import re
@@ -15,7 +15,6 @@ def parse_price(price_text):
     """Extracts a float value from a price string like '$10.99'."""
     if not price_text:
         return 0.0
-    # Find the first occurrence of a number (int or float) in the string
     match = re.search(r'\d+\.\d{2}|\d+', price_text)
     if match:
         return float(match.group())
@@ -43,7 +42,7 @@ def get_aldi_results(url, results_list):
                 })
                 count += 1
     except Exception as e:
-        print(f"Error scraping Aldi: {e}") # Log error to console
+        print(f"Error scraping Aldi: {e}")
     finally:
         if 'driver' in locals() and driver:
             driver.quit()
@@ -61,7 +60,7 @@ def get_walmart_results(url, results_list):
         for tile in product_tiles:
             if count >= 5: break
             name_element = tile.select_one('span[data-automation-id="product-title"]')
-            price_element = tile.select_one('div[data-automation-id="product-price"]')
+            price_element = tile.select_one('span[class="product-price"]')
             if name_element and price_element:
                 results_list.append({
                     'store': 'Walmart',
@@ -154,7 +153,6 @@ class ScraperGUI:
         self.results_text.delete('1.0', END)
         self.results_text.config(state='disabled')
         
-        # Reset carts for a new search
         self.carts = {'Aldi': [], 'Walmart': [], 'Target': []}
 
         threading.Thread(target=self.run_shopping_flow, args=(item_list,)).start()
@@ -175,42 +173,52 @@ class ScraperGUI:
         self.root.after(100, self.process_queue)
 
     def create_selection_window(self, data):
-        """Creates a pop-up window for the user to select a product."""
+        """Creates a pop-up window for the user to select one product PER store."""
         item_name = data['item_name']
-        results = data['results']
+        grouped_results = data['results']
 
         self.selection_window = Toplevel(self.root)
-        self.selection_window.title(f"Select a product for '{item_name}'")
+        self.selection_window.title(f"Select products for '{item_name}'")
         
-        tk.Label(self.selection_window, text=f"Found {len(results)} options for '{item_name}'. Please choose one:", pady=10).pack()
+        tk.Label(self.selection_window, text=f"Choose one option per store for '{item_name}'", pady=10).pack()
         
-        self.radio_var = StringVar(value=None)
+        self.radio_vars = {}
         
-        for i, result in enumerate(results):
-            text = f"{result['store']}: {result['name']} - {result['price']}"
-            Radiobutton(self.selection_window, text=text, variable=self.radio_var, value=i, justify='left').pack(anchor='w', padx=10)
-        
-        # Option to skip adding this item
-        Radiobutton(self.selection_window, text="Skip this item", variable=self.radio_var, value=-1, justify='left').pack(anchor='w', padx=10, pady=5)
-        
-        add_button = tk.Button(self.selection_window, text="Add to Cart", command=partial(self.handle_selection, results))
+        for store in ["Aldi", "Walmart", "Target"]:
+            store_results = grouped_results.get(store, [])
+            if not store_results:
+                continue
+
+            frame = LabelFrame(self.selection_window, text=store, padx=10, pady=10)
+            frame.pack(padx=10, pady=5, fill="x")
+
+            self.radio_vars[store] = StringVar(value=None)
+            
+            for i, result in enumerate(store_results):
+                text = f"{result['name']} - {result['price']}"
+                Radiobutton(frame, text=text, variable=self.radio_vars[store], value=i, justify='left').pack(anchor='w')
+            
+            Radiobutton(frame, text="Skip this store", variable=self.radio_vars[store], value=-1, justify='left').pack(anchor='w', pady=(5,0))
+
+        add_button = tk.Button(self.selection_window, text="Add Selections to Cart", command=partial(self.handle_selection, grouped_results))
         add_button.pack(pady=10)
         
-        # Make the main window wait for this one to close
         self.selection_window.transient(self.root)
         self.selection_window.grab_set()
         self.root.wait_window(self.selection_window)
 
-    def handle_selection(self, results):
-        """Processes the user's choice from the radio buttons."""
-        choice_index = int(self.radio_var.get())
+    def handle_selection(self, grouped_results):
+        """Processes the user's choices from each store's radio buttons."""
+        choices = []
+        for store, var in self.radio_vars.items():
+            choice_index_str = var.get()
+            if choice_index_str: # Check if a selection was made
+                choice_index = int(choice_index_str)
+                if choice_index >= 0:
+                    choices.append(grouped_results[store][choice_index])
         
-        if choice_index >= 0:
-            self.user_choice = results[choice_index]
-        else:
-            self.user_choice = "SKIP" # User chose to skip
-
-        self.selection_event.set() # Unpause the scraper thread
+        self.user_choice = choices
+        self.selection_event.set()
         self.selection_window.destroy()
 
     def generate_receipts(self):
@@ -237,7 +245,6 @@ class ScraperGUI:
             self.update_log(f"\n  {store} TOTAL: ${total:.2f}\n")
             store_totals[store] = total
         
-        # Find the cheapest store, ignoring stores with no items
         valid_stores = {s: t for s, t in store_totals.items() if self.carts[s]}
         if not valid_stores:
             self.update_log("No items were selected to compare prices.")
@@ -254,7 +261,6 @@ class ScraperGUI:
         for item in item_list:
             self.output_queue.put(("LOG", f"\n===== Searching for: {item.upper()} ====="))
             
-            # This list will be shared by the scraper threads to deposit results
             all_results = []
             threads = []
             
@@ -265,7 +271,6 @@ class ScraperGUI:
             ]
 
             for func, url in scrapers_to_run:
-                # Note: args must be a tuple, hence the comma in (all_results,)
                 thread = threading.Thread(target=func, args=(url, all_results))
                 threads.append(thread)
                 thread.start()
@@ -277,22 +282,24 @@ class ScraperGUI:
                 self.output_queue.put(("LOG", f"-> No results found for '{item}' at any store."))
                 continue
 
-            # Signal GUI to ask for user's choice
+            # Group results by store for the new selection window
+            grouped_results = {'Aldi': [], 'Walmart': [], 'Target': []}
+            for result in all_results:
+                grouped_results[result['store']].append(result)
+
             self.selection_event.clear()
-            self.output_queue.put(("PROMPT_SELECTION", {'item_name': item, 'results': all_results}))
+            self.output_queue.put(("PROMPT_SELECTION", {'item_name': item, 'results': grouped_results}))
             
-            # PAUSE here and wait for the user to make a selection in the GUI
             self.selection_event.wait()
             
-            # RESUME after selection is made
-            if self.user_choice and self.user_choice != "SKIP":
-                store = self.user_choice['store']
-                self.carts[store].append(self.user_choice)
-                self.output_queue.put(("LOG", f"-> Added '{self.user_choice['name']}' to {store} cart."))
+            if self.user_choice:
+                for choice in self.user_choice:
+                    store = choice['store']
+                    self.carts[store].append(choice)
+                    self.output_queue.put(("LOG", f"-> Added '{choice['name']}' to {store} cart."))
             else:
-                self.output_queue.put(("LOG", f"-> Skipped item '{item}'."))
+                self.output_queue.put(("LOG", f"-> No products selected for item '{item}'."))
         
-        # Signal GUI to finalize and print receipts
         self.output_queue.put(("FINALIZE", None))
 
 
