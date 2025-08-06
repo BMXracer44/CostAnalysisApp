@@ -257,7 +257,7 @@ class ScraperGUI:
             for item in items:
                 price = parse_price(item['price'])
                 if(store == "Walmart"):
-                    price /= 10
+                    price /= 100
                 total += price
                 self.update_log(f"  - {item['name']}: ${price:.2f}")
             
