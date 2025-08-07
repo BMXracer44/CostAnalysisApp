@@ -1,0 +1,1 @@
+PyInstaller script - pyinstaller --name "EncoderVisualizer" --windowed --add-data "JoralLogo.png;." --version-file version.txt --onefile ModGUI.py
